@@ -136,9 +136,80 @@ Resources:
           yum install -y httpd php
           systemctl start httpd
           systemctl enable httpd
-          echo '<html><body><h1>Login Page</h1><form method="POST" action="/login.php">Username: <input type="text" name="username"><br>Password: <input type="password" name="password"><br><input type="submit" value="Login"></form></body></html>' > /var/www/html/index.html
-          # Here, you would typically set up a PHP script to handle the login form and connect to MySQL.
-          echo '<?php phpinfo(); ?>' > /var/www/html/login.php
+
+          # Create the login and registration pages
+          echo '<html><body><h1>Registration</h1><form method="POST" action="register.php">Username: <input type="text" name="username"><br>Password: <input type="password" name="password"><br><input type="submit" value="Register"></form></body></html>' > /var/www/html/index.html
+          
+          echo '<html><body><h1>Login Page</h1><form method="POST" action="login.php">Username: <input type="text" name="username"><br>Password: <input type="password" name="password"><br><input type="submit" value="Login"></form></body></html>' > /var/www/html/login.html
+          
+          # PHP for Registration: register.php
+          echo '<?php
+            $servername = "'!Ref MyRDSInstance.Endpoint.Address'";
+            $username = "admin"; // RDS master username
+            $password = "password123"; // RDS password
+            $dbname = "loginDB"; // RDS database name
+
+            // Create connection
+            $conn = new mysqli($servername, $username, $password, $dbname);
+
+            // Check connection
+            if ($conn->connect_error) {
+                die("Connection failed: " . $conn->connect_error);
+            }
+
+            if ($_SERVER["REQUEST_METHOD"] == "POST") {
+                $user = $_POST["username"];
+                $pass = password_hash($_POST["password"], PASSWORD_BCRYPT); // Hash password
+
+                // SQL query to insert new user
+                $sql = "INSERT INTO users (username, password) VALUES ('$user', '$pass')";
+                if ($conn->query($sql) === TRUE) {
+                    echo "New record created successfully. <a href=\'login.html\'>Go to login</a>";
+                } else {
+                    echo "Error: " . $sql . "<br>" . $conn->error;
+                }
+            }
+
+            $conn->close();
+          ?>' > /var/www/html/register.php
+          
+          # PHP for Login: login.php
+          echo '<?php
+            $servername = "'!Ref MyRDSInstance.Endpoint.Address'";
+            $username = "admin"; // RDS master username
+            $password = "password123"; // RDS password
+            $dbname = "loginDB"; // RDS database name
+
+            // Create connection
+            $conn = new mysqli($servername, $username, $password, $dbname);
+
+            // Check connection
+            if ($conn->connect_error) {
+                die("Connection failed: " . $conn->connect_error);
+            }
+
+            if ($_SERVER["REQUEST_METHOD"] == "POST") {
+                $user = $_POST["username"];
+                $pass = $_POST["password"];
+
+                // SQL query to check user credentials
+                $sql = "SELECT password FROM users WHERE username='$user'";
+                $result = $conn->query($sql);
+
+                if ($result->num_rows > 0) {
+                    $row = $result->fetch_assoc();
+                    if (password_verify($pass, $row['password'])) {
+                        echo "Login successful!";
+                    } else {
+                        echo "Invalid password.";
+                    }
+                } else {
+                    echo "No user found with that username.";
+                }
+            }
+
+            $conn->close();
+          ?>' > /var/www/html/login.php
 
   # RDS MySQL Database in Private Subnet
   MyRDSInstance:
